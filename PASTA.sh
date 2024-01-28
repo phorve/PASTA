@@ -14,17 +14,18 @@
 #                                                                        #
 ##########################################################################
 
+# Main Functions #############################################################################################
 die() { 
      echo "$*" >&2
      exit 2 
 }
-
+##############################################################################################################
 needs_arg() { 
      if [ -z "$OPTARG" ]; then 
           die "ERROR: An argument is required for --$OPT!"; 
      fi; 
 }
-
+##############################################################################################################
 usage() {
      echo "|-------------------------------------------------------------------------------------------------|"
      echo "|-------------------------------------------------------------------------------------------------|"
@@ -47,8 +48,285 @@ usage() {
      echo
      echo
 }
+##############################################################################################################
+help_function() {
+     echo
+     echo
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|                                                                                                 |"
+     echo "| This script will segment individual cells in a 2D image using Cellpose, utilize this            |" 
+     echo "| segmentation to create masks, measure the mean fluorescence in each mask in the original        |"
+     echo "| .tif or .png files, and optionally output a plot of mean fluorescence intensity of those        |" 
+     echo "| masks based on user-specified groups.                                                           |"
+     echo "|                                                                                                 |"
+     echo "| Additionally, individual sections of this script can be run individually, assuming that all     |"
+     echo "| required files are present for that section to run. Individual sections can be run using        |" 
+     echo "| using the --cellpose-only, --fiji-only, and --visualization-only flags.                         |"
+     echo "|                                                                                                 |"
+     echo "| More information about Cellpose can be found at https://www.cellpose.org                        |"
+     echo "|                                                                                                 |"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|                                                                                                 |"
+     echo "|         Run the full pipeline with default settings:                                            |" 
+     echo "|                                                                                                 |"
+     echo "|              bash PASTA.sh --full-pipeline --cellpose-model=cyto                                |"
+     echo "|              ----> This will run the full pipeline. This includes:                              |" 
+     echo "|                   - Cellpose segmentation                                                       |" 
+     echo "|                   - ImageJ ROI analysis of Cellpose masks                                       |" 
+     echo "|                   - Final data output                                                           |"
+     echo "|                        - .csv data file                                                         |"
+     echo "|                        - .pzfx Graphpad Prism file                                              |"
+     echo "|                   - Visualization                                                               |"
+     echo "|                                                                                                 |"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|                                                                                                 |"
+     echo "|         Run only the Cellpose segmentation:                                                     |" 
+     echo "|                                                                                                 |"
+     echo "|              bash PASTA.sh --cellpose-only --cellpose-model=cyto                                |"
+     echo "|              ----> This will only run the Cellpose segmentation                                 |"
+     echo "|              Note: Training of new custom CellPose models should                                |"
+     echo "|                    be performed using standalone Cellpose.                                      |"
+     echo "|                                                                                                 |"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|                                                                                                 |"
+     echo "|         Run only the Cellpose segmentation:                                                     |" 
+     echo "|                                                                                                 |"
+     echo "|              bash PASTA.sh --fiji-only                                                          |"
+     echo "|              ----> This will only run the ImageJ ROI analysis of Cellpose masks, merge          |"
+     echo "|              the outputted data from ImageJ, and create a final data output (.csv + .pzfx file) |"
+     echo "|                                                                                                 |"
+     echo "|-------------------------------------------------------------------------------------------------|"        
+     echo "|                                                                                                 |"
+     echo "|         Run only the visualization segmentation:                                                |" 
+     echo "|                                                                                                 |"
+     echo "|              bash PASTA.sh --visualization-only                                                 |"
+     echo "|              ----> This will only create the final visualization.                               |"
+     echo "|                                                                                                 |"
+     echo "|-------------------------------------------------------------------------------------------------|"  
+     echo "|-------------------------------------------------------------------------------------------------|"  
+     usage
+     echo
+     echo 
+}
+##############################################################################################################
+check_deps(){
+     if [ "$CHECK_DEPS" = "TRUE" ]; then
+          echo
+          echo
+          echo "|------ Checking for all dependencies"
+          if [ -f /Applications/Fiji.app/plugins/CellPose_converter.py ]; then
+               echo "    |"
+               echo "    |---- CellPose_converter.py found"
+          else
+               echo "    |"
+               echo "    |---- CellPose_converter.py not found"
+               cp ./CellPose_converter.py /Applications/Fiji.app/plugins 
+               echo "         |---- added to FIJI"
+          fi
+          BREW_CHECK=$(which brew)
+          if [ -z "$BREW_CHECK" ]; then 
+               echo "    |"
+               echo "    |---- Homebrew not found"
+               /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+               echo "         |---- Homebrew installed"
+          else
+               echo "    |"
+               echo "    |---- Homebrew found"
+          fi
+          Z_CHECK=$(zenity --version)
+          if [ -z "$Z_CHECK" ]; then 
+               echo "    |"
+               echo "    |---- Zenity not found"
+               brew install zenity
+               echo "         |---- Zenity installed"
+          else
+               echo "    |"
+               echo "    |---- Zenity found"
+          fi
+          echo 
+          echo
+     fi
+}
+##############################################################################################################
+cellpose() {
+     echo
+     echo
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     if [ $DRY = "no" ]; then
+          echo "|--------------------------------Beginning the Cellpose segmentation------------------------------|"
+     else
+          echo "|-------------------------DRY RUN: Beginning the Cellpose segmentation----------------------------|"
+          echo "|----------------------------Note: No actual analysis will be run---------------------------------|"
+     fi
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo
+     echo
 
-# set defaults 
+     ## actvate the environment
+     source activate base
+     conda activate cellpose
+
+     echo python -m cellpose >> $input"/tmp.txt"
+     echo "--dir $original_tif_path" >> $input"/tmp.txt"
+     echo "--pretrained_model $CELLPOSE_MODEL" >> $input"/tmp.txt"
+     echo "--diameter $CELLPOSE_DIAMETER" >> $input"/tmp.txt"
+     echo "--chan $CELLPOSE_CHAN1" >> $input"/tmp.txt"
+     if [ $CELLPOSE_CHAN2 = "none" ]; then 
+          :
+     fi
+     if [ $CELLPOSE_CHAN2_DIRECTOR = "TRUE" ]; then
+          echo "--chan2 $CELLPOSE_CHAN2" >> $input"/tmp.txt"
+     fi
+     echo "--verbose" >> $input"/tmp.txt"
+     if [ $CELLPOSE_GPU = "TRUE" ]; then 
+          echo "--gpu_device" >> $input"/tmp.txt"
+     fi
+     if [ $CELLPOSE_LEVEL_DOWN = "TRUE" ]; then 
+               echo "--look_one_level_down" >> $input"/tmp.txt"
+          fi
+     if [ $CELLPOSE_RESAMPLE = "TRUE" ]; then 
+          echo "--no_resample" >> $input"/tmp.txt"
+     fi
+     if [ $CELLPOSE_NORMALIZATION = "TRUE" ]; then 
+          echo "--no_norm" >> $input"/tmp.txt"
+     fi
+     echo "--flow_threshold $CELLPOSE_FLOW_THRESHOLD" >> $input"/tmp.txt"
+     echo "--cellprob_threshold $CELLPOSE_CELL_THRESHOLD" >> $input"/tmp.txt"
+     if [ $CELLPOSE_EXCLUDE_EDGES = "TRUE" ]; then 
+          echo "--exclude_on_edges" >> $input"/tmp.txt"
+     fi
+     echo "--save_png" >> $input"/tmp.txt"
+     echo "--save_tif" >> $input"/tmp.txt"
+     echo "--save_txt" >> $input"/tmp.txt"
+
+     # fix the formatting of the txt file 
+     echo $(cat $input"/tmp.txt") > $input"/tmp.txt"
+
+     if [ $DRY = "no" ]; then
+          # now run the actual cellpose command 
+          source $input"/tmp.txt"
+
+          # organize things now that cellpose has run 
+          mkdir $input"/TIF_masks"
+          mkdir $input"/TXT_masks"
+          mkdir $input"/PNG_masks"
+          mkdir $input"/Cellpose_npy"
+          mv $original_tif_path"/"*masks.tif $input"/TIF_masks"
+          mv $original_tif_path"/"*.txt $input"/TXT_masks"
+          mv $original_tif_path"/"*masks.png $input"/PNG_masks"
+          mv $original_tif_path"/"*.npy $input"/Cellpose_npy"
+          rm $original_tif_path"/"*output.png
+
+          # remove all the blank spaces in the outputted text files 
+          for FILE in $input"/TXT_masks/"*; do 
+               sed -i '' '/^$/d' $FILE
+          done
+
+          rm $input"/tmp.txt"
+     else
+          echo
+          echo
+          echo "|-------------------------------------------------------------------------------------------------|"
+          echo "|-------------------------------------------------------------------------------------------------|"
+          echo "|------------------DRY RUN: Images will be segemented using the following command:----------------|"
+          echo
+          cat $input"/tmp.txt"
+          echo
+          echo "|----------------------------Note: No actual analysis will be run---------------------------------|"
+          echo "|-------------------------------------------------------------------------------------------------|"
+          echo "|-------------------------------------------------------------------------------------------------|"
+          echo
+          echo
+          rm $input"/tmp.txt"  
+     fi
+}
+##############################################################################################################
+fiji_main_function() {
+     echo
+     echo
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     if [ $DRY = "no" ]; then
+          echo "|----------------------------------Beginning the ImageJ Analysis----------------------------------|"
+     else
+          echo "|------------------------------DRY RUN: Beginning the ImageJ Analysis-----------------------------|"
+          echo "|-------------------------------Note: No actual analysis will be run------------------------------|"
+     fi
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo
+     echo
+     
+     # make the temporary script to run the iamgej macro
+     echo "/Applications/Fiji.app/Contents/MacOS/ImageJ-macosx --run ./CellPose_processing_macro.ijm 'dir=\"$input\"'" > $input"/tmp.sh" 
+
+     if [ $DRY = "no" ]; then
+          # Run the imagej macro 
+          source $input"/tmp.sh"
+     fi
+
+     # Remove that temporary script 
+     rm $input"/tmp.sh"
+     
+     echo
+     echo
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     if [ $DRY = "no" ]; then
+          echo "|----------------------------------Beginning the Data Merging-------------------------------------|"
+          echo "|-------------------------The user specified groups are: '${multi[@]}'"
+     else
+          echo "|-------------------------------DRY RUN: Beginning the Data Merging-------------------------------|"
+          echo "|-------------------------------Note: No actual analysis will be run------------------------------|"
+          echo "|-------------------------The user specified groups are: '${multi[@]}'"
+     fi
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo
+     echo
+
+     LENGTH=$(echo "${#multi[@]}")
+     
+     if [ $DRY = "no" ]; then
+          Rscript ./DataMerging.R $LENGTH $input ${multi[@]}  --vanilla
+     fi
+}
+##############################################################################################################
+visualization() {
+     echo
+     echo
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     if [ $DRY = "no" ]; then
+          echo "|------------------------------------Creating the Visualization-----------------------------------|"
+     else
+          echo "|--------------------------------DRY RUN: Creating the Visualization------------------------------|"
+          echo "|-------------------------------Note: No actual visualization will be made------------------------|"
+     fi
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo
+     echo
+     
+     if [ $DRY = "no" ]; then
+          mkdir $input/Visualization
+          
+          Rscript ./Visualization.R $input $PERFORM_STATS --vanilla
+
+          if [ -f ./Rplots.pdf ]; then
+               rm ./Rplots.pdf
+          fi
+     fi
+}
+# set defaults ###############################################################################################
 CELLPOSE="no"
 FIJI="no"
 VISUALIZE="no"
@@ -68,7 +346,7 @@ CELLPOSE_CELL_THRESHOLD=0
 CELLPOSE_EXCLUDE_EDGES="FALSE"
 PERFORM_STATS="FALSE"
 CHECK_DEPS="FALSE"
-
+# Parse options ##############################################################################################
 while getopts hcfr-: OPT; do
      # support long options: https://stackoverflow.com/a/28466267/519360
      if [ "$OPT" = "-" ]; then   # long option: reformulate OPT and OPTARG
@@ -145,72 +423,10 @@ while getopts hcfr-: OPT; do
                CHECK_DEPS="TRUE"
           ;;
           help ) # Handle the -h flag - Display script help information
-               echo
-               echo
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|                                                                                                 |"
-               echo "| This script will segment individual cells in a 2D image using Cellpose, utilize this            |" 
-               echo "| segmentation to create masks, measure the mean fluorescence in each mask in the original        |"
-               echo "| .tif or .png files, and optionally output a plot of mean fluorescence intensity of those        |" 
-               echo "| masks based on user-specified groups.                                                           |"
-               echo "|                                                                                                 |"
-               echo "| Additionally, individual sections of this script can be run individually, assuming that all     |"
-               echo "| required files are present for that section to run. Individual sections can be run using        |" 
-               echo "| using the --cellpose-only, --fiji-only, and --visualization-only flags.                         |"
-               echo "|                                                                                                 |"
-               echo "| More information about Cellpose can be found at https://www.cellpose.org                        |"
-               echo "|                                                                                                 |"
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|                                                                                                 |"
-               echo "|         Run the full pipeline with default settings:                                            |" 
-               echo "|                                                                                                 |"
-               echo "|              bash PASTA.sh --full-pipeline --cellpose-model=cyto                                |"
-               echo "|              ----> This will run the full pipeline. This includes:                              |" 
-               echo "|                   - Cellpose segmentation                                                       |" 
-               echo "|                   - ImageJ ROI analysis of Cellpose masks                                       |" 
-               echo "|                   - Final data output                                                           |"
-               echo "|                        - .csv data file                                                         |"
-               echo "|                        - .pzfx Graphpad Prism file                                              |"
-               echo "|                   - Visualization                                                               |"
-               echo "|                                                                                                 |"
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|                                                                                                 |"
-               echo "|         Run only the Cellpose segmentation:                                                     |" 
-               echo "|                                                                                                 |"
-               echo "|              bash PASTA.sh --cellpose-only --cellpose-model=cyto                                |"
-               echo "|              ----> This will only run the Cellpose segmentation                                 |"
-               echo "|              Note: Training of new custom CellPose models should                                |"
-               echo "|                    be performed using standalone Cellpose.                                      |"
-               echo "|                                                                                                 |"
-               echo "|-------------------------------------------------------------------------------------------------|"
-               echo "|                                                                                                 |"
-               echo "|         Run only the Cellpose segmentation:                                                     |" 
-               echo "|                                                                                                 |"
-               echo "|              bash PASTA.sh --fiji-only                                                          |"
-               echo "|              ----> This will only run the ImageJ ROI analysis of Cellpose masks, merge          |"
-               echo "|              the outputted data from ImageJ, and create a final data output (.csv + .pzfx file) |"
-               echo "|                                                                                                 |"
-               echo "|-------------------------------------------------------------------------------------------------|"        
-               echo "|                                                                                                 |"
-               echo "|         Run only the visualization segmentation:                                                |" 
-               echo "|                                                                                                 |"
-               echo "|              bash PASTA.sh --visualization-only                                                 |"
-               echo "|              ----> This will only create the final visualization.                               |"
-               echo "|                                                                                                 |"
-               echo "|-------------------------------------------------------------------------------------------------|"  
-               echo "|-------------------------------------------------------------------------------------------------|"  
-               usage
-               echo
-               echo 
+               help_function     
           ;;
           usage )
-          usage
+               usage
           ;;
           test )
                TEST="TRUE" # for testing new portions of the script. Doesn't actually link to anything right now 
@@ -218,537 +434,57 @@ while getopts hcfr-: OPT; do
      esac
 done
 shift $((OPTIND-1)) # remove parsed options and args from $@ list
-
-##### Check if the required scripts are in place and the packages are installed 
-if [ "$CHECK_DEPS" = "TRUE" ]; then
-     echo
-     echo
-     echo "|------ Checking for all dependencies"
-     if [ -f /Applications/Fiji.app/plugins/CellPose_converter.py ]; then
-          echo "    |"
-          echo "    |---- CellPose_converter.py found"
-     else
-          echo "    |"
-          echo "    |---- CellPose_converter.py not found"
-          cp ./CellPose_converter.py /Applications/Fiji.app/plugins 
-          echo "         |---- added to FIJI"
-     fi
-     BREW_CHECK=$(which brew)
-     if [ -z "$BREW_CHECK" ]; then 
-          echo "    |"
-          echo "    |---- Homebrew not found"
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          echo "         |---- Homebrew installed"
-     else
-          echo "    |"
-          echo "    |---- Homebrew found"
-     fi
-     Z_CHECK=$(zenity --version)
-     if [ -z "$Z_CHECK" ]; then 
-          echo "    |"
-          echo "    |---- Zenity not found"
-          brew install zenity
-          echo "         |---- Zenity installed"
-     else
-          echo "    |"
-          echo "    |---- Zenity found"
-     fi
-     echo 
-     echo
-fi
-
-##### Full pipeline with only a single input 
+check_deps
+# Full pipeline ############################################################################################## 
 if [ $FULL = "yes" ]; then
-     if [ $DRY = "no" ]; then
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|--------------------------------Beginning the Cellpose segmentation------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-
-          input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
-          original_tif_path=($input"/Original_Images")
-
-          ## actvate the environment
-          source activate base
-          conda activate cellpose
-
-          echo "python -m cellpose" >> $input"/tmp.txt"
-          echo "--dir $original_tif_path" >> $input"/tmp.txt"
-          echo "--pretrained_model $CELLPOSE_MODEL" >> $input"/tmp.txt"
-          echo "--diameter $CELLPOSE_DIAMETER" >> $input"/tmp.txt"
-          echo "--chan $CELLPOSE_CHAN1" >> $input"/tmp.txt"
-          if [ $CELLPOSE_CHAN2 = "none" ]; then 
-               :
-          fi
-          if [ $CELLPOSE_CHAN2_DIRECTOR = "TRUE" ]; then
-               echo "--chan2 $CELLPOSE_CHAN2" >> $input"/tmp.txt"
-          fi
-          echo "--verbose" >> $input"/tmp.txt"
-          if [ $CELLPOSE_GPU = "TRUE" ]; then 
-               echo "--gpu_device" >> $input"/tmp.txt"
-          fi
-          if [ $CELLPOSE_LEVEL_DOWN = "TRUE" ]; then 
-                    echo "--look_one_level_down" >> $input"/tmp.txt"
-               fi
-          if [ $CELLPOSE_RESAMPLE = "TRUE" ]; then 
-               echo "--no_resample" >> $input"/tmp.txt"
-          fi
-          if [ $CELLPOSE_NORMALIZATION = "TRUE" ]; then 
-               echo "--no_norm" >> $input"/tmp.txt"
-          fi
-          echo "--flow_threshold $CELLPOSE_FLOW_THRESHOLD" >> $input"/tmp.txt"
-          echo "--cellprob_threshold $CELLPOSE_CELL_THRESHOLD" >> $input"/tmp.txt"
-          if [ $CELLPOSE_EXCLUDE_EDGES = "TRUE" ]; then 
-               echo "--exclude_on_edges" >> $input"/tmp.txt"
-          fi
-          echo "--save_png" >> $input"/tmp.txt"
-          echo "--save_tif" >> $input"/tmp.txt"
-          echo "--save_txt" >> $input"/tmp.txt"
-
-          # fix the formatting of the txt file 
-          echo $(cat $input"/tmp.txt") > $input"/tmp.txt"
-
-          # now run the actual cellpose command 
-          source $input"/tmp.txt"
-
-          # organize things now that cellpose has run 
-          mkdir $input"/TIF_masks"
-          mkdir $input"/TXT_masks"
-          mkdir $input"/PNG_masks"
-          mkdir $input"/Cellpose_npy"
-          mv $original_tif_path"/"*masks.tif $input"/TIF_masks"
-          mv $original_tif_path"/"*.txt $input"/TXT_masks"
-          mv $original_tif_path"/"*masks.png $input"/PNG_masks"
-          mv $original_tif_path"/"*.npy $input"/Cellpose_npy"
-          rm $original_tif_path"/"*output.png
-
-          # remove all the blank spaces in the outputted text files 
-          for FILE in $input"/TXT_masks/"*; do 
-               sed -i '' '/^$/d' $FILE
-          done
-
-          rm $input"/tmp.txt"     
-     else
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------Dry Run: Only running the Cellpose segmentation-------------------------|"
-          echo "|----------------------------Note: No actual analysis will be run---------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-          
-          input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
-          original_tif_path=($input"/Original_Images")
-
-          echo python -m cellpose >> $input"/tmp.txt"
-          echo "--dir $original_tif_path" >> $input"/tmp.txt"
-          echo "--pretrained_model $CELLPOSE_MODEL" >> $input"/tmp.txt"
-          echo "--diameter $CELLPOSE_DIAMETER" >> $input"/tmp.txt"
-          echo "--chan $CELLPOSE_CHAN1" >> $input"/tmp.txt"
-          if [ $CELLPOSE_CHAN2 = "none" ]; then 
-               :
-          fi
-          if [ $CELLPOSE_CHAN2_DIRECTOR = "TRUE" ]; then
-               echo "--chan2 $CELLPOSE_CHAN2" >> $input"/tmp.txt"
-          fi
-          echo "--verbose" >> $input"/tmp.txt"
-          if [ $CELLPOSE_GPU = "TRUE" ]; then 
-               echo "--gpu_device" >> $input"/tmp.txt"
-          fi
-          if [ $CELLPOSE_LEVEL_DOWN = "TRUE" ]; then 
-                    echo "--look_one_level_down" >> $input"/tmp.txt"
-               fi
-          if [ $CELLPOSE_RESAMPLE = "TRUE" ]; then 
-               echo "--no_resample" >> $input"/tmp.txt"
-          fi
-          if [ $CELLPOSE_NORMALIZATION = "TRUE" ]; then 
-               echo "--no_norm" >> $input"/tmp.txt"
-          fi
-          echo "--flow_threshold $CELLPOSE_FLOW_THRESHOLD" >> $input"/tmp.txt"
-          echo "--cellprob_threshold $CELLPOSE_CELL_THRESHOLD" >> $input"/tmp.txt"
-          if [ $CELLPOSE_EXCLUDE_EDGES = "TRUE" ]; then 
-               echo "--exclude_on_edges" >> $input"/tmp.txt"
-          fi
-          echo "--save_png" >> $input"/tmp.txt"
-          echo "--save_tif" >> $input"/tmp.txt"
-          echo "--save_txt" >> $input"/tmp.txt"
-         
-         # fix the formatting of the txt file 
-          echo $(cat $input"/tmp.txt") > $input"/tmp.txt"
-
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|------------------DRY RUN: Images will be segemented using the following command:----------------|"
-          echo
-          cat $input"/tmp.txt"
-          echo
-          echo "|----------------------------Note: No actual analysis will be run---------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-          rm $input"/tmp.txt"      
-     fi
-     if [ $DRY = "no" ]; then
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|----------------------------------Beginning the ImageJ Analysis----------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-
-          # make the temporary script to run the iamgej macro
-          echo "/Applications/Fiji.app/Contents/MacOS/ImageJ-macosx --run ./CellPose_processing_macro.ijm 'dir=\"$input\"'" > $input"/tmp.sh" 
-
-          # Run the imagej macro 
-          source $input"/tmp.sh"
-
-          # Remove that temporary script 
-          rm $input"/tmp.sh"
-          
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|--------------------------------------Beginning Data Merging-------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-
-          LENGTH=$(echo "${#multi[@]}")
-          
-          Rscript ./DataMerging.R $LENGTH $input ${multi[@]}  --vanilla
-
-     else
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|------------------------------DRY RUN: Beginning the ImageJ Analysis-----------------------------|"
-          echo "|-------------------------------Note: No actual analysis will be run------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-     fi
-     if [ $DRY = "no" ]; then
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|------------------------------------Creating the Visualization-----------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-          
-          mkdir $input/Visualization
-          
-          Rscript ./Visualization.R $input $PERFORM_STATS --vanilla
-
-          if [ -f ./Rplots.pdf ]; then
-               rm ./Rplots.pdf
-          fi
-
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|---------------------------------------------Completed-------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-
-     else
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|--------------------------------DRY RUN: Creating the Visualization------------------------------|"
-          echo "|-------------------------------Note: No actual analysis will be run------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-
-     fi
+     input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
+     original_tif_path=($input"/Original_Images")
+     cellpose
+     fiji_main_function
+     visualization
+     echo
+     echo
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|---------------------------------------------Completed-------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo
+     echo
 fi
-
+##### Cellpose only
 if [ $CELLPOSE = "yes" ]; then
-     if [ $DRY = "no" ]; then
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|------------------------------Only running the Cellpose segmentation-----------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-
-          input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
-          original_tif_path=($input"/Original_Images")
-
-          ## actvate the environment
-          source activate base
-          conda activate cellpose
-
-          echo python -m cellpose >> $input"/tmp.txt"
-          echo "--dir $original_tif_path" >> $input"/tmp.txt"
-          echo "--pretrained_model $CELLPOSE_MODEL" >> $input"/tmp.txt"
-          echo "--diameter $CELLPOSE_DIAMETER" >> $input"/tmp.txt"
-          echo "--chan $CELLPOSE_CHAN1" >> $input"/tmp.txt"
-          if [ $CELLPOSE_CHAN2 = "none" ]; then 
-               :
-          fi
-          if [ $CELLPOSE_CHAN2_DIRECTOR = "TRUE" ]; then
-               echo "--chan2 $CELLPOSE_CHAN2" >> $input"/tmp.txt"
-          fi
-          echo "--verbose" >> $input"/tmp.txt"
-          if [ $CELLPOSE_GPU = "TRUE" ]; then 
-               echo "--gpu_device" >> $input"/tmp.txt"
-          fi
-          if [ $CELLPOSE_LEVEL_DOWN = "TRUE" ]; then 
-                    echo "--look_one_level_down" >> $input"/tmp.txt"
-               fi
-          if [ $CELLPOSE_RESAMPLE = "TRUE" ]; then 
-               echo "--no_resample" >> $input"/tmp.txt"
-          fi
-          if [ $CELLPOSE_NORMALIZATION = "TRUE" ]; then 
-               echo "--no_norm" >> $input"/tmp.txt"
-          fi
-          echo "--flow_threshold $CELLPOSE_FLOW_THRESHOLD" >> $input"/tmp.txt"
-          echo "--cellprob_threshold $CELLPOSE_CELL_THRESHOLD" >> $input"/tmp.txt"
-          if [ $CELLPOSE_EXCLUDE_EDGES = "TRUE" ]; then 
-               echo "--exclude_on_edges" >> $input"/tmp.txt"
-          fi
-          echo "--save_png" >> $input"/tmp.txt"
-          echo "--save_tif" >> $input"/tmp.txt"
-          echo "--save_txt" >> $input"/tmp.txt"
-
-          # fix the formatting of the txt file 
-          echo $(cat $input"/tmp.txt") > $input"/tmp.txt"
-
-          # now run the actual cellpose command 
-          source $input"/tmp.txt"
-
-          # organize things now that cellpose has run 
-          mkdir $input"/TIF_masks"
-          mkdir $input"/TXT_masks"
-          mkdir $input"/PNG_masks"
-          mkdir $input"/Cellpose_npy"
-          mv $original_tif_path"/"*masks.tif $input"/TIF_masks"
-          mv $original_tif_path"/"*.txt $input"/TXT_masks"
-          mv $original_tif_path"/"*masks.png $input"/PNG_masks"
-          mv $original_tif_path"/"*.npy $input"/Cellpose_npy"
-          rm $original_tif_path"/"*output.png
-
-          # remove all the blank spaces in the outputted text files 
-          for FILE in $input"/TXT_masks/"*; do 
-               sed -i '' '/^$/d' $FILE
-          done
-
-          rm $input"/tmp.txt"     
-
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|---------------------------------------------Completed-------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-
-     else
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------DRY RUN: Only running the Cellpose segmentation-------------------------|"
-          echo "|----------------------------Note: No actual analysis will be run---------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-          
-          input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
-          original_tif_path=($input"/Original_Images")
-
-          echo python -m cellpose >> $input"/tmp.txt"
-          echo "--dir $original_tif_path" >> $input"/tmp.txt"
-          echo "--pretrained_model $CELLPOSE_MODEL" >> $input"/tmp.txt"
-          echo "--diameter $CELLPOSE_DIAMETER" >> $input"/tmp.txt"
-          echo "--chan $CELLPOSE_CHAN1" >> $input"/tmp.txt"
-          if [ $CELLPOSE_CHAN2 = "none" ]; then 
-               :
-          fi
-          if [ $CELLPOSE_CHAN2_DIRECTOR = "TRUE" ]; then
-               echo "--chan2 $CELLPOSE_CHAN2" >> $input"/tmp.txt"
-          fi
-          echo "--verbose" >> $input"/tmp.txt"
-          if [ $CELLPOSE_GPU = "TRUE" ]; then 
-               echo "--gpu_device" >> $input"/tmp.txt"
-          fi
-          if [ $CELLPOSE_LEVEL_DOWN = "TRUE" ]; then 
-                    echo "--look_one_level_down" >> $input"/tmp.txt"
-               fi
-          if [ $CELLPOSE_RESAMPLE = "TRUE" ]; then 
-               echo "--no_resample" >> $input"/tmp.txt"
-          fi
-          if [ $CELLPOSE_NORMALIZATION = "TRUE" ]; then 
-               echo "--no_norm" >> $input"/tmp.txt"
-          fi
-          echo "--flow_threshold $CELLPOSE_FLOW_THRESHOLD" >> $input"/tmp.txt"
-          echo "--cellprob_threshold $CELLPOSE_CELL_THRESHOLD" >> $input"/tmp.txt"
-          if [ $CELLPOSE_EXCLUDE_EDGES = "TRUE" ]; then 
-               echo "--exclude_on_edges" >> $input"/tmp.txt"
-          fi
-          echo "--save_png" >> $input"/tmp.txt"
-          echo "--save_tif" >> $input"/tmp.txt"
-          echo "--save_txt" >> $input"/tmp.txt"
-         
-         # fix the formatting of the txt file 
-          echo $(cat $input"/tmp.txt") > $input"/tmp.txt"
-
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|------------------DRY RUN: Images will be segemented using the following command:----------------|"
-          echo
-          cat $input"/tmp.txt"
-          echo
-          echo "|----------------------------Note: No actual analysis will be run---------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-          rm $input"/tmp.txt"      
-     fi
+     input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
+     original_tif_path=($input"/Original_Images")
+     cellpose
+     echo
+     echo
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|---------------------------------Cellpose Segmentation Completed---------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo
+     echo
 fi
-
+# FIJI only ##################################################################################################
 if [ $FIJI = "yes" ]; then
-     if [ $DRY = "no" ]; then
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|----------------------------------Beginning the ImageJ Analysis----------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-
-          input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
-          original_tif_path=($input"/Original_Images")
-
-          # make the temporary script to run the iamgej macro
-          echo "/Applications/Fiji.app/Contents/MacOS/ImageJ-macosx --run ./CellPose_processing_macro.ijm 'dir=\"$input\"'" > $input"/tmp.sh" 
-
-          # Run the imagej macro 
-          source $input"/tmp.sh"
-
-          # Remove that temporary script 
-          rm $input"/tmp.sh"
-          
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|--------------------------------------Beginning Data Merging-------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-
-          LENGTH=$(echo "${#multi[@]}")
-          
-          Rscript ./DataMerging.R $LENGTH $input ${multi[@]}  --vanilla
-
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|---------------------------------------------Completed-------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-          
-     else
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-----------------------------DRY RUN: Only running the ImageJ Analysis---------------------------|"
-          echo "|-------------------------------Note: No actual analysis will be run------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-     fi
-fi 
-
+     input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
+     original_tif_path=($input"/Original_Images")
+     fiji_main_function
+     echo
+     echo
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|---------------------------------------------Completed-------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo "|-------------------------------------------------------------------------------------------------|"
+     echo
+     echo
+fi   
+# Visualization only #########################################################################################
 if [ $VISUALIZE = "yes" ]; then
-     if [ $DRY = "no" ]; then
-          
-          input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
-          original_tif_path=($input"/Original_Images")
-
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|------------------------------------Creating the Visualization-----------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-          
-          mkdir $input/Visualization
-
-          Rscript ./Visualization.R $input $PERFORM_STATS --vanilla
-
-          if [ -f ./Rplots.pdf ]; then
-               rm ./Rplots.pdf
-          fi
-
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|---------------------------------------------Completed-------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-     
-     else
-          echo
-          echo
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|--------------------------------DRY RUN: Creating the Visualization------------------------------|"
-          echo "|-------------------------------Note: No actual analysis will be run------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo "|-------------------------------------------------------------------------------------------------|"
-          echo
-          echo
-     fi
+     input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
+     original_tif_path=($input"/Original_Images")
+     visualization
 fi
