@@ -17,6 +17,7 @@
 # Main Functions #############################################################################################
 die() { 
      echo "$*" >&2
+     echo
      exit 2 
 }
 ##############################################################################################################
@@ -173,6 +174,11 @@ cellpose() {
      ## actvate the environment
      source activate base
      conda activate cellpose
+
+     # Check to make sure that a model has been specified 
+     if [ $CELLPOSE_MODEL = "none" ]; then
+          die "ERROR: An argument is required when running Cellpose! Use --cellpose-model=MODEL to specify which model to use."
+     fi
 
      echo python -m cellpose >> $input"/tmp.txt"
      echo "--dir $original_tif_path" >> $input"/tmp.txt"
@@ -431,6 +437,9 @@ while getopts hcfr-: OPT; do
           test )
                TEST="TRUE" # for testing new portions of the script. Doesn't actually link to anything right now 
           ;;
+          * )
+               die "ERROR: Illegal option --$OPT" 
+          ;;
      esac
 done
 shift $((OPTIND-1)) # remove parsed options and args from $@ list
@@ -452,7 +461,7 @@ if [ $FULL = "yes" ]; then
      echo
      echo
 fi
-##### Cellpose only
+# Cellpose only ##############################################################################################
 if [ $CELLPOSE = "yes" ]; then
      input=$(zenity  --file-selection --title="Choose a directory" --file-filter=""Downloads" "Desktop"" --directory)
      original_tif_path=($input"/Original_Images")
