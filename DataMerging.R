@@ -44,42 +44,42 @@ for (f in 1:length(files_to_read)){
   final_data = rbind(final_data, temp_data) # this is the final dataframe to be outputted as a .csv file 
   
   # now we have to build the prism data 
-  new.col = temp_data$Mean
-  this_treatment = unique(temp_data$Treatment)
-  temp_prism_data = data.frame("treatment" = new.col)
-  this_count = length(which(counter$group == this_treatment))
-  if (f == 1)
-  {
-    prism_data = temp_prism_data
-    this_treatment = paste0(this_treatment,"_",this_count)
-    prism_data = prism_data %>% rename(!!this_treatment := treatment) 
-  }
-  else
-  {
-    if (nrow(prism_data) > length(new.col))
-    {
-      prism_data$new.col <- c(new.col, rep(NA, nrow(prism_data)-length(new.col))) 
-    }
-    else
-    {
-      difference = abs(length(new.col)-nrow(prism_data))
-      prism_data[nrow(prism_data)+difference,] <- NA
-      prism_data$new.col = new.col
-    }
-    if (this_count > 0)
-    {
-      this_treatment = paste0(this_treatment,"_",this_count)
-      prism_data = prism_data %>% rename(!!this_treatment := new.col)
-    }
-    else
-    {
-      prism_data = prism_data %>% rename(!!this_treatment := new.col)
-    }
-  }
+  #new.col = temp_data$Mean
+  #this_treatment = unique(temp_data$Treatment)
+  #temp_prism_data = data.frame("treatment" = new.col)
+  #this_count = length(which(counter$group == this_treatment))
+  #if (f == 1)
+  #{
+  #  prism_data = temp_prism_data
+  #  this_treatment = paste0(this_treatment,"_",this_count)
+  #  prism_data = prism_data %>% rename(!!this_treatment := treatment) 
+  #}
+  #else
+  #{
+  #  if (nrow(prism_data) > length(new.col))
+  #  {
+  #    prism_data$new.col <- c(new.col, rep(NA, nrow(prism_data)-length(new.col))) 
+  #  }
+  #  else
+  #  {
+  #    difference = abs(length(new.col)-nrow(prism_data))
+  #    prism_data[nrow(prism_data)+difference,] <- NA
+  #    prism_data$new.col = new.col
+  #  }
+  #  if (this_count > 0)
+  #  {
+  #    this_treatment = paste0(this_treatment,"_",this_count)
+  #    prism_data = prism_data %>% rename(!!this_treatment := new.col)
+  #  }
+  # else
+  # {
+  #    prism_data = prism_data %>% rename(!!this_treatment := new.col)
+  #  }
+  #}
 }
 
 # Write the dataframe csv file
 write_csv(final_data, file = paste0(directory,"/Measurements/CombinedData.csv"))
 
 # Write the prism file
-write_pzfx(prism_data, row_names=FALSE, path = paste0(directory,"/Measurements/CombinedData.pzfx"))
+#write_pzfx(prism_data, row_names=FALSE, path = paste0(directory,"/Measurements/CombinedData.pzfx"))
