@@ -82,7 +82,6 @@ help_function() {
      echo "|                   - ImageJ ROI analysis of Cellpose masks                                       |" 
      echo "|                   - Final data output                                                           |"
      echo "|                        - .csv data file                                                         |"
-     echo "|                        - .pzfx Graphpad Prism file                                              |"
      echo "|                   - Visualization                                                               |"
      echo "|                                                                                                 |"
      echo "|-------------------------------------------------------------------------------------------------|"
