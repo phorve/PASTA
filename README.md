@@ -62,7 +62,6 @@ After running the full pipeline (this took 331.48 seconds on a 2021 Apple M1 Mac
 │   ├── 004_img_group2.png_Results.csv
 │   ├── 005_img_group2.png_Results.csv
 │   ├── CombinedData.csv
-│   └── CombinedData.pzfx
 ├── Original_Images
 │   ├── 000_img_group1.png
 │   ├── 001_img_group1.png
@@ -104,7 +103,7 @@ After running the full pipeline (this took 331.48 seconds on a 2021 Apple M1 Mac
 * Cellpose_npy
     * These are the .npy files readable by the CellPose GUI
 * Measurements
-    * These are .csv files for the measurements taken of each ROI for each image, a .csv of all the data combined (called "CombinedData.csv") and a PRISM Graphpad-compatible file (Note: this currently only contains mean fluorescence intensity whereas the .csv file contains all measurements possible in FIJI). 
+    * These are .csv files for the measurements taken of each ROI for each image, a .csv of all the data combined (called "CombinedData.csv").
 * Original_Images
     * The original image files. 
 * Overlays
