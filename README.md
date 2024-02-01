@@ -160,3 +160,39 @@ cellprob threshold, decrease to find more and larger masks (Default: 0)
 discard masks which touch edges of image (DEFAULT = `FALSE`)
 ### --visualization-stats
 whether or not to perform an ANOVA and post-hoc significance testing on user-defined groups
+### --visualization-metric
+which measures from FIJI should be plotted (DEFAULT = `Mean`) Options include the following a full description of each can be found [here](https://imagej.net/ij/docs/menus/analyze.html#set):
+* Area
+* Mean
+* StdDev
+* Mode
+* Min
+* Max
+* X
+* Y
+* XM
+* YM
+* Perim.
+* BX
+* BY
+* Width
+* Height
+* Major
+* Minor
+* Angle
+* Circ.
+* Feret
+* IntDen
+* Median
+* Skew
+* Kurt
+* X.Area
+* RawIntDen
+* Ch
+* FeretX
+* FeretY
+* FeretAngle
+* MinFeret
+* AR
+* Round
+* Solidity

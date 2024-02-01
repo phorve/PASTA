@@ -41,6 +41,7 @@ usage() {
      echo "|     [--cellpose-flow-threshold=THRESHOLD]  [--cellpose-cell-threshold=THRESHOLD]                |" 
      echo "|     [--cellpose-exclude-edges]             [--visualization-stats]                              |"  
      echo "|     [--check-dependencies]                 [--visualization-only]                               |"
+     echo "|     [--visualization-metric]                                                                    |"
      echo "|     [--usage]                              [--help]                                             |"
      echo "|-------------------------------------------------------------------------------------------------|"
      echo "|-------------------------------------------------------------------------------------------------|"
@@ -301,7 +302,7 @@ fiji_main_function() {
      LENGTH=$(echo "${#multi[@]}")
      
      if [ $DRY = "no" ]; then
-          Rscript ./DataMerging.R $LENGTH $input ${multi[@]}  --vanilla
+          Rscript ./DataMerging.R $LENGTH $input ${multi[@]} --vanilla
      fi
 }
 ##############################################################################################################
@@ -322,9 +323,12 @@ visualization() {
      echo
      
      if [ $DRY = "no" ]; then
+
+          LENGTH2=$(echo "${#plots[@]}")
+
           mkdir $input/Visualization
           
-          Rscript ./Visualization.R $input $PERFORM_STATS --vanilla
+          Rscript ./Visualization.R $LENGTH2 $input $PERFORM_STATS ${plots[@]} --vanilla
 
           if [ -f ./Rplots.pdf ]; then
                rm ./Rplots.pdf
@@ -351,6 +355,7 @@ CELLPOSE_CELL_THRESHOLD=0
 CELLPOSE_EXCLUDE_EDGES="FALSE"
 PERFORM_STATS="FALSE"
 CHECK_DEPS="FALSE"
+plots="Mean"
 # Parse options ##############################################################################################
 while getopts hcfr-: OPT; do
      # support long options: https://stackoverflow.com/a/28466267/519360
@@ -423,6 +428,9 @@ while getopts hcfr-: OPT; do
           ;;
           visualization-stats )
                PERFORM_STATS="TRUE"
+          ;;
+          visualization-metric )
+               plots+=("$OPTARG")
           ;;
           check-dependencies )
                CHECK_DEPS="TRUE"
