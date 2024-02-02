@@ -98,7 +98,7 @@ After running the full pipeline (this took 331.48 seconds on a 2021 Apple M1 Mac
 │   ├── 004_img_group2_cp_outlines.txt
 │   └── 005_img_group2_cp_outlines.txt
 └── Visualization
-    └── Plot.pdf
+    └── Mean_Plot.pdf
 ```
 * Cellpose_npy
     * These are the .npy files readable by the CellPose GUI
@@ -164,6 +164,7 @@ whether or not to perform an ANOVA and post-hoc significance testing on user-def
 which measures from FIJI should be plotted (DEFAULT = `Mean`) Options include the following a full description of each can be found [here](https://imagej.net/ij/docs/menus/analyze.html#set):
 * Area
 * Mean
+* Count (the # of cells in each image)
 * StdDev
 * Mode
 * Min
